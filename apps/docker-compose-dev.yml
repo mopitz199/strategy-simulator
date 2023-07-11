@@ -14,7 +14,7 @@ services:
       context: strategy_simulator/
     ports:
       - "${STRATEGY_SIMULATOR_PORT}:${STRATEGY_SIMULATOR_PORT}"
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:${STRATEGY_SIMULATOR_PORT}"
+    command: sh -c "python manage.py migrate && python manage.py runserver ${STRATEGY_SIMULATOR_HOST}:${STRATEGY_SIMULATOR_PORT}"
     volumes:
       - ./strategy_simulator:/home/app
     depends_on:
@@ -25,6 +25,24 @@ services:
       DB_PASSWORD: "${DB_PASSWORD}"
       DB_HOST: "${DB_HOST}"
       DB_PORT: "${DB_PORT}"
+  strategy-simulator-jupyter:
+    build:
+      context: strategy_simulator/
+    ports:
+      - "${JUPYTER_PORT}:${JUPYTER_PORT}"
+    command: sh -c "python manage.py migrate && python manage.py shell_plus --notebook"
+    volumes:
+      - ./strategy_simulator:/home/app
+    depends_on:
+      - db
+    environment:
+      DB_NAME: "${DB_NAME}"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT}"
+      JUPYTER_PORT: "${JUPYTER_PORT}"
+      JUPYTER_HOST: "${JUPYTER_HOST}"
 
 volumes:
   pgdata:

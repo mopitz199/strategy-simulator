@@ -14,7 +14,7 @@ services:
       context: strategy_simulator/
     ports:
       - "${STRATEGY_SIMULATOR_PORT}:${STRATEGY_SIMULATOR_PORT}"
-    command: sh -c "python manage.py migrate && gunicorn --env DJANGO_SETTINGS_MODULE=strategy_simulator.settings_prod strategy_simulator.wsgi -b 0.0.0.0:${STRATEGY_SIMULATOR_PORT}"
+    command: sh -c "python manage.py migrate && gunicorn --env DJANGO_SETTINGS_MODULE=strategy_simulator.settings_prod strategy_simulator.wsgi -b ${STRATEGY_SIMULATOR_HOST}:${STRATEGY_SIMULATOR_PORT}"
     volumes:
       - ./strategy_simulator:/home/app
     depends_on:
