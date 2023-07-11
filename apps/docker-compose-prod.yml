@@ -1,0 +1,34 @@
+version: "3.8"
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      DB_NAME: "${DB_NAME}"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  strategy-simulator:
+    build:
+      context: strategy_simulator/
+    ports:
+      - "${STRATEGY_SIMULATOR_PORT}:${STRATEGY_SIMULATOR_PORT}"
+    command: sh -c "python manage.py migrate && gunicorn --env DJANGO_SETTINGS_MODULE=strategy_simulator.settings_prod strategy_simulator.wsgi -b 0.0.0.0:${STRATEGY_SIMULATOR_PORT}"
+    volumes:
+      - ./strategy_simulator:/home/app
+    depends_on:
+      - db
+    environment:
+      DB_NAME: "${DB_NAME}"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}" 
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+      AWS_STORAGE_BUCKET_NAME: "${AWS_STORAGE_BUCKET_NAME}"
+      AWS_S3_REGION_NAME: "${AWS_S3_REGION_NAME}"
+
+volumes:
+  pgdata:
