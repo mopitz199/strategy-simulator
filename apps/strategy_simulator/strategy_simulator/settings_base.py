@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'landing_page',
+    'asset',
 ]
 INSTALLED_APPS += ['django_extensions']
 
