@@ -34,10 +34,18 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+]
+# Apps comming from third parties
+INSTALLED_APPS += [
+    'django_extensions',
+    'rest_framework',
+]
+# Our own apps
+INSTALLED_APPS += [
     'landing_page',
     'asset',
+    'utils',
 ]
-INSTALLED_APPS += ['django_extensions']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
