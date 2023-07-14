@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from utils import constants as utils_constants
 
 
