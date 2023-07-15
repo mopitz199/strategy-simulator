@@ -19,10 +19,6 @@ class TestBuildDataFame:
         data_frame = BuildDataFrame.execute(candles=candles)
         data_frame["date"] = pandas.to_datetime(data_frame["date"])
 
-        import pdb
-
-        pdb.set_trace()
-
         row_1 = data_frame.iloc[0].tolist()
         row_1[0] = row_1[0].to_pydatetime()
 
