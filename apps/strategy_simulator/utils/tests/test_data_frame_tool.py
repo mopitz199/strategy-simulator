@@ -273,6 +273,8 @@ class TestDataFrameToolAddBiggestDistance:
             number_of_registers=2,
             low_column_name="low",
             high_column_name="high",
+            biggest_high_column_name="biggest_high",
+            lowest_low_column_name="lowest_low",
         )
         assert tool.data_frame["biggest_high"].tolist() == biggest_high
         assert tool.data_frame["lowest_low"].tolist() == lowest_low

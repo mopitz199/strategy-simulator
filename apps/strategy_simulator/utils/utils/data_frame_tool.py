@@ -87,6 +87,8 @@ class DataFameTool:
         number_of_registers: int,
         low_column_name: str,
         high_column_name: str,
+        biggest_high_column_name: str,
+        lowest_low_column_name: str,
     ):
         low_prices = self.data_frame[low_column_name].tolist()
         high_prices = self.data_frame[high_column_name].tolist()
@@ -131,5 +133,5 @@ class DataFameTool:
                         end_index=index,
                     )
 
-        self.data_frame["biggest_high"] = max_prices_columns
-        self.data_frame["lowest_low"] = min_prices_columns
+        self.data_frame[biggest_high_column_name] = max_prices_columns
+        self.data_frame[lowest_low_column_name] = min_prices_columns
