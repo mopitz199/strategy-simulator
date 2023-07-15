@@ -7,3 +7,5 @@ TREND = "trend"
 CLOSE = "close"
 HIGH = "high"
 LOW = "low"
+
+NONE_CONSTANT = "none"
