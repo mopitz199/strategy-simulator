@@ -7,16 +7,24 @@ from utils.utils.data_frame_tool import DataFameTool
 
 
 class TestDataFrameToolAddEma:
-    def test_add_ema(self):
+    @pytest.mark.parametrize(
+        "col1",
+        [
+            [Decimal("1"), Decimal("2")],
+            [Decimal("3"), Decimal("4")],
+            [3, 4],
+        ],
+    )
+    def test_add_ema(self, col1):
         data = {
-            "col1": [Decimal("1"), Decimal("2")],
-            "col2": [Decimal("3"), Decimal("4")],
+            "col1": col1,
         }
         data_frame = pandas.DataFrame(data=data)
 
         tool = DataFameTool(data_frame=data_frame)
-        tool.add_ema(ema_period=55, reference_column_name="col2", ema_column_name="ema")
-        assert list(tool.data_frame.columns) == ["col1", "col2", "ema"]
+        tool.add_ema(ema_period=55, reference_column_name="col1", ema_column_name="ema")
+        assert list(tool.data_frame.columns) == ["col1", "ema"]
+        assert type(tool.data_frame["ema"].tolist()[0]) == Decimal
 
 
 class TestDataFrameToolAddTrend:

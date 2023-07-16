@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from utils import constants as utils_constants
 from utils.utils.list_tool import ListTool
 
@@ -18,6 +20,12 @@ class DataFameTool:
             self.data_frame[reference_column_name]
             .ewm(span=ema_period, adjust=False)
             .mean()
+        )
+
+        ema_values = self.data_frame[ema_column_name].tolist()
+
+        self.data_frame[ema_column_name] = list(
+            map(lambda ema_value: Decimal(str(round(ema_value, 2))), ema_values)
         )
 
     """The trend basically indicate us if the tendency of the last X
