@@ -120,7 +120,7 @@ class Simulate:
         while aux_date <= end_date:
             self.should_we_aggregate_amount(date=aux_date)
             row = self.get_row(aux_date)
-            if row:
+            if row is not None:
                 purchase_price = self.process_day(date=aux_date, row=row)
                 if purchase_price:
                     number_of_assets = self.get_number_of_assets_to_buy(

@@ -143,16 +143,16 @@ class TestSimulate:
         assert number_of_assets == result
 
     @pytest.mark.parametrize(
-        "date,trend,purchase_price,number_of_assets,not_invested_amount",
+        "date,trend,purchase_price",
         [
-            ("2023-01-02", "bullish", Decimal("120"), Decimal("8.33"), Decimal("0")),
-            ("2023-01-01", "bullish", Decimal("120"), Decimal("10"), Decimal("0")),
-            ("2023-01-02", "bullish", None, Decimal("0"), Decimal("1000")),
-            ("2023-01-01", "bullish", None, Decimal("0"), Decimal("1200")),
-            ("2023-01-02", "bearish", Decimal("120"), Decimal("8.33"), Decimal("0")),
-            ("2023-01-01", "bearish", Decimal("120"), Decimal("10"), Decimal("0")),
-            ("2023-01-02", "bearish", None, Decimal("0"), Decimal("1000")),
-            ("2023-01-01", "bearish", None, Decimal("0"), Decimal("1200")),
+            ("2023-01-02", "bullish", Decimal("120")),
+            ("2023-01-01", "bullish", Decimal("120")),
+            ("2023-01-02", "bullish", None),
+            ("2023-01-01", "bullish", None),
+            ("2023-01-02", "bearish", Decimal("120")),
+            ("2023-01-01", "bearish", Decimal("120")),
+            ("2023-01-02", "bearish", None),
+            ("2023-01-01", "bearish", None),
         ],
     )
     @patch(
@@ -168,14 +168,11 @@ class TestSimulate:
         date,
         trend,
         purchase_price,
-        number_of_assets,
-        not_invested_amount,
     ):
         mock_get_bullish_purchase_price.return_value = purchase_price
         mock_get_bearish_purchase_price.return_value = purchase_price
 
         strategy_state = StrategyState(
-            not_invested_amount=Decimal("1000"),
             aggregate_amount=Decimal("200"),
             number_of_assets=Decimal("0"),
         )
