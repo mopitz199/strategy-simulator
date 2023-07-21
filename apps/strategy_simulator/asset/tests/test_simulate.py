@@ -73,11 +73,8 @@ class TestSimulate:
         ],
     )
     def test_get_bullish_purchase_price(self, row, result):
-        simulate = Simulate(
-            {
-                "bullish_attractive_percentage": Decimal("0.04"),
-            }
-        )
+        strategy_state = StrategyState(bullish_attractive_percentage=Decimal("0.04"))
+        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
 
         bulllish_purchase_price = simulate.get_bullish_purchase_price(row=row)
         assert bulllish_purchase_price == result
@@ -124,11 +121,8 @@ class TestSimulate:
         ],
     )
     def test_get_bearish_purchase_price(self, row, result):
-        simulate = Simulate(
-            {
-                "bearish_attractive_percentage": Decimal("-0.07"),
-            }
-        )
+        strategy_state = StrategyState(bearish_attractive_percentage=Decimal("-0.07"))
+        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
 
         bulllish_purchase_price = simulate.get_bearish_purchase_price(row=row)
         assert bulllish_purchase_price == result
@@ -141,11 +135,8 @@ class TestSimulate:
         ],
     )
     def test_get_number_of_assets_to_buy(self, purchase_price, result):
-        simulate = Simulate(
-            {
-                "not_invested_amount": Decimal("1000"),
-            }
-        )
+        strategy_state = StrategyState(not_invested_amount=Decimal("1000"))
+        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
         number_of_assets = simulate.get_number_of_assets_to_buy(
             purchase_price=purchase_price
         )
@@ -164,8 +155,12 @@ class TestSimulate:
             ("2023-01-01", "bearish", None, Decimal("0"), Decimal("1200")),
         ],
     )
-    @patch("asset.use_cases.simulate.Simulate.get_bearish_purchase_price")
-    @patch("asset.use_cases.simulate.Simulate.get_bullish_purchase_price")
+    @patch(
+        "asset.use_cases.simulate.MopitzStrategySimulation.get_bearish_purchase_price"
+    )
+    @patch(
+        "asset.use_cases.simulate.MopitzStrategySimulation.get_bullish_purchase_price"
+    )
     def test_process_day(
         self,
         mock_get_bullish_purchase_price,
@@ -178,20 +173,21 @@ class TestSimulate:
     ):
         mock_get_bullish_purchase_price.return_value = purchase_price
         mock_get_bearish_purchase_price.return_value = purchase_price
-        simulate = Simulate(
-            {
-                "not_invested_amount": Decimal("1000"),
-                "aggregate_amount": Decimal("200"),
-                "number_of_assets": Decimal("0"),
-            }
+
+        strategy_state = StrategyState(
+            not_invested_amount=Decimal("1000"),
+            aggregate_amount=Decimal("200"),
+            number_of_assets=Decimal("0"),
         )
+        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
         simulate.data_frame = pandas.DataFrame(
             data={"date": [pandas.Timestamp(date)], "trend": [trend]}
         )
         simulate.data_index = {date: 0}
 
         date = datetime.strptime(date, "%Y-%m-%d").date()
-        simulate.process_day(date=date)
 
-        assert simulate.strategy_state["number_of_assets"] == number_of_assets
-        assert simulate.strategy_state["not_invested_amount"] == not_invested_amount
+        result_purchase_price = simulate.process_day(
+            date=date, row=simulate.data_frame.iloc[0]
+        )
+        assert purchase_price == result_purchase_price
