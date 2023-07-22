@@ -286,3 +286,85 @@ class TestDataFrameToolAddBiggestDistance:
         )
         assert tool.data_frame["biggest_high"].tolist() == biggest_high
         assert tool.data_frame["lowest_low"].tolist() == lowest_low
+
+
+class TestDataFrameToolAddAllTimeHighAndLow:
+    @pytest.mark.parametrize(
+        "low_data,high_data,all_time_high_data,all_time_low_data",
+        [
+            (
+                [
+                    Decimal("100"),
+                    Decimal("140"),
+                    Decimal("160"),
+                    Decimal("180"),
+                    Decimal("200"),
+                ],
+                [
+                    Decimal("120"),
+                    Decimal("160"),
+                    Decimal("180"),
+                    Decimal("200"),
+                    Decimal("220"),
+                ],
+                [
+                    Decimal("120"),
+                    Decimal("160"),
+                    Decimal("180"),
+                    Decimal("200"),
+                    Decimal("220"),
+                ],
+                [
+                    Decimal("100"),
+                    Decimal("100"),
+                    Decimal("100"),
+                    Decimal("100"),
+                    Decimal("100"),
+                ],
+            ),
+            (
+                [
+                    Decimal("100"),
+                    Decimal("140"),
+                    Decimal("80"),
+                    Decimal("90"),
+                    Decimal("50"),
+                ],
+                [
+                    Decimal("120"),
+                    Decimal("150"),
+                    Decimal("90"),
+                    Decimal("100"),
+                    Decimal("200"),
+                ],
+                [
+                    Decimal("120"),
+                    Decimal("150"),
+                    Decimal("150"),
+                    Decimal("150"),
+                    Decimal("200"),
+                ],
+                [
+                    Decimal("100"),
+                    Decimal("100"),
+                    Decimal("80"),
+                    Decimal("80"),
+                    Decimal("50"),
+                ],
+            ),
+        ],
+    )
+    def test_add_all_time_high_and_low(
+        self, low_data, high_data, all_time_high_data, all_time_low_data
+    ):
+        data = {"low": low_data, "high": high_data}
+        data_frame = pandas.DataFrame(data=data)
+        tool = DataFameTool(data_frame=data_frame)
+        tool.add_all_time_high_and_low(
+            low_column_name="low",
+            high_column_name="high",
+            all_time_high_column_name="all_time_high",
+            all_time_low_column_name="all_time_low",
+        )
+        assert data_frame["all_time_high"].tolist() == all_time_high_data
+        assert data_frame["all_time_low"].tolist() == all_time_low_data

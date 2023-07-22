@@ -143,3 +143,33 @@ class DataFameTool:
 
         self.data_frame[biggest_high_column_name] = max_prices_columns
         self.data_frame[lowest_low_column_name] = min_prices_columns
+
+    """The highest value from the biggining until the current high price candle
+    and the lowest value from the beggining until the current low price candle
+    """
+
+    def add_all_time_high_and_low(
+        self,
+        low_column_name: str,
+        high_column_name: str,
+        all_time_high_column_name: str,
+        all_time_low_column_name: str,
+    ):
+        low_prices = self.data_frame[low_column_name].tolist()
+        high_prices = self.data_frame[high_column_name].tolist()
+
+        all_time_high = high_prices[0]
+        all_time_low = low_prices[0]
+
+        all_time_high_column = []
+        all_time_low_column = []
+
+        for index in range(0, len(low_prices)):
+            all_time_low = min(low_prices[index], all_time_low)
+            all_time_high = max(high_prices[index], all_time_high)
+
+            all_time_low_column.append(all_time_low)
+            all_time_high_column.append(all_time_high)
+
+        self.data_frame[all_time_high_column_name] = all_time_high_column
+        self.data_frame[all_time_low_column_name] = all_time_low_column

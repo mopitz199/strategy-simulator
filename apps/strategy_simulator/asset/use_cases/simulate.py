@@ -89,6 +89,12 @@ class Simulate:
             biggest_high_column_name="biggest_high",
             lowest_low_column_name="lowest_low",
         )
+        data_frame_tool.add_all_time_high_and_low(
+            low_column_name="low",
+            high_column_name="high",
+            all_time_high_column_name="all_time_high",
+            all_time_low_column_name="all_time_low",
+        )
         return data_frame_tool.data_frame
 
     def get_number_of_assets_to_buy(self, purchase_price: Decimal):
@@ -105,7 +111,7 @@ class Simulate:
         candles = CandleRepository.get_candles(
             {
                 "asset_id": asset.id,
-                "candle_datetime__range": [from_date, end_date],
+                "candle_datetime__ltw": end_date,
                 "periodicity": "daily",
             },
             order_by="candle_datetime",
@@ -116,10 +122,16 @@ class Simulate:
             process_index_function=ProcessIndexFunctions.process_timestamp_to_date_index,
         )
 
+        self.usd_total_invested = [Decimal("0")]
+
+        self.buy_prices = []
+        self.buy_prices_date = []
+
         aux_date = from_date
         while aux_date <= end_date:
             self.should_we_aggregate_amount(date=aux_date)
             row = self.get_row(aux_date)
+
             if row is not None:
                 purchase_price = self.process_day(date=aux_date, row=row)
                 if purchase_price:
@@ -128,7 +140,19 @@ class Simulate:
                     )
                     self.strategy_state.number_of_assets += number_of_assets
                     self.strategy_state.not_invested_amount = Decimal("0")
+                    self.usd_total_invested.append(
+                        self.strategy_state.number_of_assets * row["low"]
+                        + self.strategy_state.not_invested_amount
+                    )
+
+                    self.buy_prices.append(purchase_price)
+                    self.buy_prices_date.append(str(aux_date))
+                else:
+                    self.usd_total_invested.append(self.usd_total_invested[-1])
+
             aux_date += timedelta(days=1)
+
+        self.data_frame["usd_total_invested"] = self.usd_total_invested
 
 
 class MopitzStrategySimulation(Simulate):
