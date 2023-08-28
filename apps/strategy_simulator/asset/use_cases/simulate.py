@@ -19,8 +19,42 @@ class StrategyState:
     not_invested_amount: Optional[Decimal] = None
     aggregate_amount: Optional[Decimal] = None
     number_of_assets: Optional[Decimal] = None
+
+
+@dataclass
+class StrategyConfiguration:
+    number_of_registers_for_trend: int
+    number_of_registers_for_biggest_distance: int
+    ema_period: Decimal
     bearish_attractive_percentage: Optional[Decimal] = None
     bullish_attractive_percentage: Optional[Decimal] = None
+
+
+@dataclass
+class StrategyHistoryExecution:
+    buy_prices: dict[list[Decimal]]
+    buy_prices_date: dict[list[str]]
+    amount_invested: dict[list[Decimal]]
+
+    def __init__(self):
+        self.buy_prices = {}
+        self.buy_prices_date = {}
+        self.amount_invested = {}
+
+    def add_buy_price(self, color, value):
+        if color not in self.buy_prices:
+            self.buy_prices[color] = []
+        self.buy_prices[color].append(value)
+
+    def add_buy_prices_date(self, color, value):
+        if color not in self.buy_prices_date:
+            self.buy_prices_date[color] = []
+        self.buy_prices_date[color].append(value)
+
+    def add_amount_invested(self, color, value):
+        if color not in self.amount_invested:
+            self.amount_invested[color] = []
+        self.amount_invested[color].append(value)
 
 
 class ProcessIndexFunctions:
@@ -33,26 +67,27 @@ class Simulate:
     def __init__(
         self,
         strategy_state: StrategyState,
-        ema_period: Optional[int] = None,
-        number_of_registers_for_trend: Optional[int] = None,
-        number_of_registers_for_biggest_distance: Optional[int] = None,
+        strategy_configuration: StrategyConfiguration,
     ):
-        self.ema_period = ema_period
-        self.number_of_registers_for_trend = number_of_registers_for_trend
-        self.number_of_registers_for_biggest_distance = (
-            number_of_registers_for_biggest_distance
+        self.strategy_state = (
+            strategy_state  # All the info ro configure the strategy paraemters
         )
-        self.strategy_state = strategy_state
-        self.data_frame = None
-        self.data_index = None
+        self.strategy_configuration = (
+            strategy_configuration  # All the info ro configure the strategy paraemters
+        )
+        self.history_execution = StrategyHistoryExecution()
 
-        self.buy_column = []
-        self.buy_date = []
+        self.base_data_frame = (
+            None  # The main data frame with the info of the whole asset history
+        )
+        self.data_index = (
+            {}
+        )  # Index to get a row of the base_data_frame from any key(eg: date)
 
     def build_index(self, column_name: str, process_index_function: Callable) -> dict:
         data_index = {}
-        for index in self.data_frame.index:
-            value = self.data_frame.iloc[index][column_name]
+        for index in self.base_data_frame.index:
+            value = self.base_data_frame.iloc[index][column_name]
             processed_value = process_index_function(value)
             data_index[processed_value] = index
         self.data_index = data_index
@@ -61,7 +96,7 @@ class Simulate:
         index_row = self.data_index.get(str(date))
         row = None
         if index_row:
-            row = self.data_frame.iloc[index_row]
+            row = self.base_data_frame.iloc[index_row]
         return row
 
     def build_complete_data_frame(self, candles: QuerySet) -> pandas.DataFrame:
@@ -69,11 +104,11 @@ class Simulate:
         data_frame_tool = DataFameTool(data_frame=data_frame)
         data_frame_tool.add_ema(
             ema_column_name="ema",
-            ema_period=self.ema_period,
+            ema_period=self.strategy_configuration.ema_period,
             reference_column_name="close",
         )
         data_frame_tool.add_trend(
-            number_of_registers=self.number_of_registers_for_trend,
+            number_of_registers=self.strategy_configuration.number_of_registers_for_trend,
             ema_column_name="ema",
             trend_column_name="trend",
         )
@@ -83,7 +118,7 @@ class Simulate:
             attractive_percentage_column_name="attractive_percentage",
         )
         data_frame_tool.add_biggest_distances(
-            number_of_registers=self.number_of_registers_for_biggest_distance,
+            number_of_registers=self.strategy_configuration.number_of_registers_for_biggest_distance,
             low_column_name="low",
             high_column_name="high",
             biggest_high_column_name="biggest_high",
@@ -97,68 +132,177 @@ class Simulate:
         )
         return data_frame_tool.data_frame
 
-    def get_number_of_assets_to_buy(self, purchase_price: Decimal):
-        return round(self.strategy_state.not_invested_amount / purchase_price, 2)
+    def get_number_of_assets_to_buy(
+        self,
+        purchase_price: Decimal,
+        last_purchase_date: Optional[datetime],
+        last_purchase_price: Optional[Decimal],
+        row=None,
+    ):
+        return (
+            round(self.strategy_state.not_invested_amount / purchase_price, 2),
+            "green",
+        )
+
+    def fill_aggregate_amount(self):
+        self.strategy_state.not_invested_amount += self.strategy_state.aggregate_amount
 
     def should_we_aggregate_amount(self, date: datetime.date):
-        if date.weekday() == 6:
-            self.strategy_state.not_invested_amount += (
-                self.strategy_state.aggregate_amount
-            )
+        return date.weekday() == 6
+
+    def get_total_amount(self, price: Decimal = None):
+        return self.strategy_state.not_invested_amount + (
+            self.strategy_state.number_of_assets * price
+        )
 
     def execute(self, ticker: str, from_date: datetime, end_date: datetime):
         asset = AssetRepository.get_asset({"ticker": ticker})
         candles = CandleRepository.get_candles(
             {
                 "asset_id": asset.id,
-                "candle_datetime__ltw": end_date,
+                "candle_datetime__lte": end_date,
                 "periodicity": "daily",
             },
             order_by="candle_datetime",
         )
-        self.data_frame = self.build_complete_data_frame(candles=candles)
+        self.base_data_frame = self.build_complete_data_frame(candles=candles)
         self.build_index(
             column_name="date",
             process_index_function=ProcessIndexFunctions.process_timestamp_to_date_index,
         )
 
-        self.usd_total_invested = [Decimal("0")]
+        self.total_amount = []
+        self.total_not_invested_amount = []
 
-        self.buy_prices = []
-        self.buy_prices_date = []
+        first_index = None
+
+        last_purchase_date = None
+        last_purchase_price = None
 
         aux_date = from_date
         while aux_date <= end_date:
-            self.should_we_aggregate_amount(date=aux_date)
+            if self.should_we_aggregate_amount(date=aux_date):
+                self.fill_aggregate_amount()
+
             row = self.get_row(aux_date)
 
             if row is not None:
-                purchase_price = self.process_day(date=aux_date, row=row)
-                if purchase_price:
-                    number_of_assets = self.get_number_of_assets_to_buy(
-                        purchase_price=purchase_price
-                    )
-                    self.strategy_state.number_of_assets += number_of_assets
-                    self.strategy_state.not_invested_amount = Decimal("0")
-                    self.usd_total_invested.append(
-                        self.strategy_state.number_of_assets * row["low"]
-                        + self.strategy_state.not_invested_amount
-                    )
+                if first_index is None:
+                    first_index = self.data_index.get(str(aux_date))
 
-                    self.buy_prices.append(purchase_price)
-                    self.buy_prices_date.append(str(aux_date))
-                else:
-                    self.usd_total_invested.append(self.usd_total_invested[-1])
+                purchase_price = self.process_day(date=aux_date, row=row)
+
+                if purchase_price:
+                    number_of_assets, color = self.get_number_of_assets_to_buy(
+                        purchase_price=purchase_price,
+                        last_purchase_date=last_purchase_date,
+                        last_purchase_price=last_purchase_price,
+                        row=row,
+                    )
+                    amount_to_invest = number_of_assets * purchase_price
+
+                    self.strategy_state.number_of_assets += number_of_assets
+                    self.strategy_state.not_invested_amount -= amount_to_invest
+
+                    if amount_to_invest:
+                        last_purchase_date = aux_date
+                        last_purchase_price = purchase_price
+
+                        self.history_execution.add_buy_price(
+                            color=color, value=purchase_price
+                        )
+                        self.history_execution.add_buy_prices_date(
+                            color=color, value=str(aux_date)
+                        )
+                        self.history_execution.add_amount_invested(
+                            color=color, value=amount_to_invest
+                        )
+
+                if first_index is not None:
+                    self.total_amount.append(self.get_total_amount(price=row["close"]))
+                    self.total_not_invested_amount.append(
+                        self.strategy_state.not_invested_amount
+                    )
 
             aux_date += timedelta(days=1)
 
-        self.data_frame["usd_total_invested"] = self.usd_total_invested
+        self.final_data_frame = self.base_data_frame.iloc[first_index:]
+        self.final_data_frame["total_amount"] = self.total_amount
+        self.final_data_frame["not_invested_amount"] = self.total_not_invested_amount
 
 
 class MopitzStrategySimulation(Simulate):
+    def get_percentage_between_ema_and_purchase_price(
+        self, purchase_price: Decimal, ema: Decimal
+    ) -> Decimal:
+        percentage = (purchase_price * 100) / ema - 100
+        percentage = round(percentage, 2)
+        return percentage
+
+    def get_borrow_amount_left(self):
+        return self.strategy_state.aggregate_amount * 54 + min(
+            self.strategy_state.not_invested_amount, Decimal("0")
+        )
+
+    def get_color(self, amount_to_invest):
+        if Decimal("0") < amount_to_invest <= Decimal("200"):
+            return "#37d43c"
+        elif Decimal("200") < amount_to_invest <= Decimal("500"):
+            return "#eb6805"
+        elif Decimal("500") < amount_to_invest <= Decimal("1000"):
+            return "#f70000"
+        elif Decimal("1000") < amount_to_invest <= Decimal("3000"):
+            return "#f700df"
+        elif Decimal("3000") < amount_to_invest <= Decimal("10000"):
+            return "#960000"
+        elif Decimal("10000") < amount_to_invest:
+            return "#960082"
+        else:
+            return "#1c1a1a"
+
+    def get_number_of_assets_to_buy(
+        self,
+        purchase_price: Decimal,
+        last_purchase_date: Optional[datetime],
+        last_purchase_price: Optional[Decimal],
+        row=None,
+    ):
+        row_date = row["date"].to_pydatetime().date()
+        if (
+            last_purchase_price
+            and purchase_price is not None
+            and 100 - ((last_purchase_price * 100) / purchase_price) > -5
+            and last_purchase_date + timedelta(days=21) > row_date
+        ):
+            return Decimal("0"), "black"
+
+        amount_to_invest = Decimal("0")
+
+        percentage = self.get_percentage_between_ema_and_purchase_price(
+            purchase_price=purchase_price, ema=row["ema"]
+        )
+        absolute_percentage = abs(percentage)
+        borrow_amount_left = self.get_borrow_amount_left()
+
+        if row["trend"] == "bullish":
+            week_factor = Decimal("5")
+            amount_to_invest = min(
+                self.strategy_state.aggregate_amount * week_factor, borrow_amount_left
+            )
+        elif row["trend"] == "bearish":
+            aux_amount_to_invest = (
+                row["all_time_high"] * absolute_percentage * absolute_percentage
+            )
+            amount_to_invest = min(aux_amount_to_invest, borrow_amount_left)
+
+        number_of_assets = amount_to_invest / purchase_price
+        return round(number_of_assets, 2), self.get_color(
+            amount_to_invest=amount_to_invest
+        )
+
     def get_bullish_purchase_price(self, row) -> Optional[Decimal]:
         aux_buyer_price = row["ema"] * (
-            1 + self.strategy_state.bullish_attractive_percentage
+            1 + self.strategy_configuration.bullish_attractive_percentage
         )
 
         if row["low"] <= aux_buyer_price <= row["high"]:
@@ -175,7 +319,7 @@ class MopitzStrategySimulation(Simulate):
 
     def get_bearish_purchase_price(self, row) -> Optional[Decimal]:
         aux_buyer_price = row["ema"] * (
-            1 + self.strategy_state.bearish_attractive_percentage
+            1 + self.strategy_configuration.bearish_attractive_percentage
         )
 
         if row["low"] <= aux_buyer_price <= row["high"]:

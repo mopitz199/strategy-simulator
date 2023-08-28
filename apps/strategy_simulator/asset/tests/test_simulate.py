@@ -1,7 +1,7 @@
 import pandas
 import pytest
 
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from asset.use_cases.simulate import *
 
@@ -23,8 +23,8 @@ class TestSimulate:
         data = {
             "date": [pandas.Timestamp("2023-01-01"), pandas.Timestamp("2023-04-15")]
         }
-        simulate = Simulate(None)
-        simulate.data_frame = pandas.DataFrame(data=data)
+        simulate = Simulate(None, None)
+        simulate.base_data_frame = pandas.DataFrame(data=data)
         simulate.build_index(
             column_name="date",
             process_index_function=ProcessIndexFunctions.process_timestamp_to_date_index,
@@ -73,8 +73,15 @@ class TestSimulate:
         ],
     )
     def test_get_bullish_purchase_price(self, row, result):
-        strategy_state = StrategyState(bullish_attractive_percentage=Decimal("0.04"))
-        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
+        strategy_configuration = StrategyConfiguration(
+            number_of_registers_for_trend=0,
+            number_of_registers_for_biggest_distance=0,
+            ema_period=0,
+            bullish_attractive_percentage=Decimal("0.04"),
+        )
+        simulate = MopitzStrategySimulation(
+            strategy_state=None, strategy_configuration=strategy_configuration
+        )
 
         bulllish_purchase_price = simulate.get_bullish_purchase_price(row=row)
         assert bulllish_purchase_price == result
@@ -121,26 +128,120 @@ class TestSimulate:
         ],
     )
     def test_get_bearish_purchase_price(self, row, result):
-        strategy_state = StrategyState(bearish_attractive_percentage=Decimal("-0.07"))
-        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
+        strategy_configuration = StrategyConfiguration(
+            number_of_registers_for_trend=0,
+            number_of_registers_for_biggest_distance=0,
+            ema_period=0,
+            bearish_attractive_percentage=Decimal("-0.07"),
+        )
+        simulate = MopitzStrategySimulation(
+            strategy_state=None, strategy_configuration=strategy_configuration
+        )
 
         bulllish_purchase_price = simulate.get_bearish_purchase_price(row=row)
         assert bulllish_purchase_price == result
 
     @pytest.mark.parametrize(
-        "purchase_price,result",
+        "purchase_price,last_purchase_date,last_purchase_price,trend,date,ema,all_time_high,borrow_amount_left,result",
         [
-            (Decimal("100"), Decimal("10")),
-            (Decimal("150"), Decimal("6.67")),
+            (
+                Decimal("100"),
+                "2023-01-01",
+                Decimal("90"),
+                "bullish",
+                "2023-01-10",
+                Decimal("0"),
+                Decimal("0"),
+                Decimal("0"),
+                Decimal("0"),
+            ),
+            (
+                Decimal("80"),
+                "2023-01-01",
+                Decimal("100"),
+                "bullish",
+                "2023-01-30",
+                Decimal("1"),
+                Decimal("1"),
+                Decimal("500"),
+                Decimal("6.25"),
+            ),
+            (
+                Decimal("80"),
+                "2023-01-01",
+                Decimal("100"),
+                "bullish",
+                "2023-01-30",
+                Decimal("1"),
+                Decimal("1"),
+                Decimal("1500"),
+                Decimal("12.5"),
+            ),
+            (
+                Decimal("80"),
+                "2023-01-01",
+                Decimal("100"),
+                "bearish",
+                "2023-01-30",
+                Decimal("85"),
+                Decimal("150"),
+                Decimal("1500"),
+                Decimal("18.75"),
+            ),
+            (
+                Decimal("80"),
+                "2023-01-01",
+                Decimal("100"),
+                "bearish",
+                "2023-01-30",
+                Decimal("81"),
+                Decimal("150"),
+                Decimal("1500"),
+                Decimal("2.84"),
+            ),
         ],
     )
-    def test_get_number_of_assets_to_buy(self, purchase_price, result):
-        strategy_state = StrategyState(not_invested_amount=Decimal("1000"))
-        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
-        number_of_assets = simulate.get_number_of_assets_to_buy(
-            purchase_price=purchase_price
+    @patch("asset.use_cases.simulate.MopitzStrategySimulation.get_borrow_amount_left")
+    def test_get_number_of_assets_to_buy(
+        self,
+        mock_get_borrow_amount_left,
+        purchase_price,
+        last_purchase_date,
+        last_purchase_price,
+        trend,
+        date,
+        ema,
+        all_time_high,
+        borrow_amount_left,
+        result,
+    ):
+        mock_row_date = Mock()
+        mock_to_pydatetime = Mock()
+        mock_row_date.to_pydatetime.return_value = mock_to_pydatetime
+        mock_to_pydatetime.date.return_value = datetime.strptime(date, "%Y-%m-%d")
+
+        mock_get_borrow_amount_left.return_value = borrow_amount_left
+
+        strategy_state = StrategyState(
+            not_invested_amount=Decimal("10000"),
+            number_of_assets=0,
+            aggregate_amount=Decimal("200"),
         )
-        assert number_of_assets == result
+        simulate = MopitzStrategySimulation(
+            strategy_state=strategy_state, strategy_configuration=None
+        )
+        number_of_assets_to_buy, _ = simulate.get_number_of_assets_to_buy(
+            purchase_price=purchase_price,
+            last_purchase_date=datetime.strptime(last_purchase_date, "%Y-%m-%d"),
+            last_purchase_price=last_purchase_price,
+            row={
+                "trend": trend,
+                "date": mock_row_date,
+                "ema": ema,
+                "all_time_high": all_time_high,
+            },
+        )
+        assert number_of_assets_to_buy == result
 
     @pytest.mark.parametrize(
         "date,trend,purchase_price",
@@ -176,7 +277,10 @@ class TestSimulate:
             aggregate_amount=Decimal("200"),
             number_of_assets=Decimal("0"),
         )
-        simulate = MopitzStrategySimulation(strategy_state=strategy_state)
+
+        simulate = MopitzStrategySimulation(
+            strategy_state=strategy_state, strategy_configuration=None
+        )
         simulate.data_frame = pandas.DataFrame(
             data={"date": [pandas.Timestamp(date)], "trend": [trend]}
         )
